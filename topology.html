@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Topology Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #2c3e50);
+            color: #f5f7fa;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.85;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .topology-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            height: 75vh;
+            overflow: hidden;
+            position: relative;
+            padding: 15px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: #4facfe;
+        }
+
+        .connection-status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .connected {
+            background: linear-gradient(to right, #11998e, #38ef7d);
+            color: #fff;
+        }
+
+        .disconnected {
+            background: linear-gradient(to right, #ff416c, #ff4b2b);
+            color: #fff;
+        }
+
+        .status-icon {
+            font-size: 1.4rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #f5f7fa;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(to right, #3a9bfe, #00d9fe);
+        }
+
+        .legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 10;
+            color: #fff;
+            font-size: 1.2rem;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid #4facfe;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .node-info {
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 15px;
+            position: absolute;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+            max-width: 300px;
+        }
+
+        .node-info h3 {
+            color: #4facfe;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+
+        .node-info p {
+            margin: 5px 0;
+            font-size: 0.9rem;
+        }
+
+        .node-info .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px 0;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .topology-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .topology-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">NetVis Pro</div>
+            <h1>Network Topology Visualization</h1>
+            <p class="subtitle">Interactive visualization of your network infrastructure showing devices, connections, and real-time status</p>
+        </header>
+
+        <div id="connection-status" class="connection-status disconnected">
+            <span class="status-icon">⚠️</span>
+            <span>Controller not connected to network</span>
+        </div>
+
+        <div class="dashboard">
+            <div class="topology-container">
+                <div id="topology"></div>
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Loading topology data...</div>
+                </div>
+                <div class="node-info"></div>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-title">Network Information</h2>
+                
+                <div class="topology-stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="node-count">0</div>
+                        <div class="stat-label">Total Nodes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="link-count">0</div>
+                        <div class="stat-label">Connections</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="active-nodes">0</div>
+                        <div class="stat-label">Active Devices</div>
+                    </div>
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2ecc71;"></div>
+                        <div>Active Router</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #e74c3c;"></div>
+                        <div>Inactive Router</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3498db;"></div>
+                        <div>Switch</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f39c12;"></div>
+                        <div>Host</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #9b59b6;"></div>
+                        <div>Firewall</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #1abc9c;"></div>
+                        <div>Server</div>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button class="btn btn-primary" id="refresh-btn">
+                        <span>🔄</span> Refresh
+                    </button>
+                    <button class="btn" id="export-btn">
+                        <span>💾</span> Export
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" id="back-btn">
+                <span>←</span> Back to Dashboard
+            </button>
+        </div>
+        
+        <div class="footer">
+            Network Topology Visualization v2.0 | Real-time Monitoring System
+        </div>
+    </div>
+
+    <script>
+        // Sample topology data
+        const topologyData = {
+            nodes: [
+                { id: "r1", label: "Core Router", type: "router", status: "active", ip: "192.168.1.1", model: "Cisco 9000" },
+                { id: "s1", label: "Switch A", type: "switch", status: "active", ip: "192.168.1.10", model: "HP 2920" },
+                { id: "s2", label: "Switch B", type: "switch", status: "active", ip: "192.168.1.11", model: "HP 2920" },
+                { id: "h1", label: "Server 1", type: "server", status: "active", ip: "192.168.1.100", model: "Dell R740" },
+                { id: "h2", label: "Workstation", type: "host", status: "active", ip: "192.168.1.101", model: "HP Z4" },
+                { id: "fw1", label: "Firewall", type: "firewall", status: "active", ip: "192.168.1.2", model: "Fortinet 100F" },
+                { id: "r2", label: "Edge Router", type: "router", status: "inactive", ip: "192.168.1.3", model: "Juniper MX204" },
+                { id: "h3", label: "NAS", type: "server", status: "active", ip: "192.168.1.102", model: "Synology RS3618" },
+                { id: "s3", label: "Switch C", type: "switch", status: "active", ip: "192.168.1.12", model: "Cisco 2960" }
+            ],
+            edges: [
+                { source: "r1", target: "s1" },
+                { source: "r1", target: "s2" },
+                { source: "r1", target: "fw1" },
+                { source: "s1", target: "h1" },
+                { source: "s1", target: "h2" },
+                { source: "s2", target: "h3" },
+                { source: "s2", target: "s3" },
+                { source: "fw1", target: "r2" },
+                { source: "s3", target: "r2" }
+            ]
+        };
+
+        // Initialize the visualization
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial stats
+            document.getElementById('node-count').textContent = topologyData.nodes.length;
+            document.getElementById('link-count').textContent = topologyData.edges.length;
+            document.getElementById('active-nodes').textContent = topologyData.nodes.filter(node => node.status === 'active').length;
+            
+            // Simulate connection status change after 2 seconds
+            setTimeout(() => {
+                const statusDiv = document.getElementById('connection-status');
+                statusDiv.textContent = 'Controller connected to network';
+                statusDiv.className = 'connection-status connected';
+                statusDiv.innerHTML = '<span class="status-icon">✅</span> Controller connected to network';
+            }, 2000);
+            
+            // Render topology
+            renderTopology(topologyData);
+            
+            // Hide loading after 1.5 seconds
+            setTimeout(() => {
+                document.querySelector('.loading').style.display = 'none';
+            }, 1500);
+            
+            // Setup button events
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                document.querySelector('.loading').style.display = 'flex';
+                setTimeout(() => {
+                    document.querySelector('.loading').style.display = 'none';
+                    renderTopology(topologyData);
+                }, 1000);
+            });
+            
+            document.getElementById('back-btn').addEventListener('click', function() {
+                alert('Navigating back to dashboard...');
+            });
+            
+            document.getElementById('export-btn').addEventListener('click', function() {
+                alert('Exporting network topology...');
+            });
+        });
+
+        function renderTopology(topologyData) {
+            const container = document.getElementById('topology');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            // Clear container
+            container.innerHTML = '';
+            
+            const svg = d3.select('#topology')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+            
+            // Create zoom group
+            const zoomGroup = svg.append('g');
+            
+            // Create simulation
+            const simulation = d3.forceSimulation(topologyData.nodes)
+                .force('link', d3.forceLink(topologyData.edges).id(d => d.id).distance(120))
+                .force('charge', d3.forceManyBody().strength(-500))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(40));
+            
+            // Draw links
+            const link = zoomGroup.append('g')
+                .attr('class', 'links')
+                .selectAll('line')
+                .data(topologyData.edges)
+                .enter()
+                .append('line')
+                .attr('stroke', 'rgba(255, 255, 255, 0.4)')
+                .attr('stroke-width', 2)
+                .attr('stroke-dasharray', function(d) {
+                    const targetNode = topologyData.nodes.find(n => n.id === d.target.id);
+                    return targetNode && targetNode.status === 'active' ? '0' : '5,3';
+                })
+                .attr('marker-end', 'url(#arrowhead)');
+            
+            // Draw nodes
+            const node = zoomGroup.append('g')
+                .attr('class', 'nodes')
+                .selectAll('g')
+                .data(topologyData.nodes)
+                .enter()
+                .append('g')
+                .attr('class', 'node')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+            
+            // Add node glow effect
+            node.append('circle')
+                .attr('r', 24)
+                .attr('fill', 'rgba(255, 255, 255, 0.1)')
+                .attr('stroke', 'rgba(255, 255, 255, 0.2)')
+                .attr('stroke-width', 2);
+            
+            // Add node circles
+            node.append('circle')
+                .attr('r', 20)
+                .attr('fill', d => {
+                    switch(d.type) {
+                        case 'router': return d.status === 'active' ? '#2ecc71' : '#e74c3c';
+                        case 'switch': return '#3498db';
+                        case 'host': return '#f39c12';
+                        case 'firewall': return '#9b59b6';
+                        case 'server': return '#1abc9c';
+                        default: return '#95a5a6';
+                    }
+                })
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2);
+            
+            // Add node icons
+            node.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', 5)
+                .attr('fill', '#fff')
+                .style('font-size', '12px')
+                .style('font-weight', 'bold')
+                .text(d => {
+                    switch(d.type) {
+                        case 'router': return 'R';
+                        case 'switch': return 'S';
+                        case 'host': return 'H';
+                        case 'firewall': return 'F';
+                        case 'server': return 'S';
+                        default: return '?';
+                    }
+                });
+            
+            // Add node labels
+            node.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', 30)
+                .attr('fill', '#fff')
+                .style('font-size', '10px')
+                .style('font-weight', 'bold')
+                .style('text-shadow', '0 1px 2px rgba(0,0,0,0.5)')
+                .text(d => d.label);
+            
+            // Add status indicator
+            node.append('circle')
+                .attr('cx', 15)
+                .attr('cy', -15)
+                .attr('r', 5)
+                .attr('fill', d => d.status === 'active' ? '#2ecc71' : '#e74c3c')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 1);
+            
+            // Add arrowhead marker
+            svg.append('defs').append('marker')
+                .attr('id', 'arrowhead')
+                .attr('viewBox', '-0 -5 10 10')
+                .attr('refX', 25)
+                .attr('refY', 0)
+                .attr('orient', 'auto')
+                .attr('markerWidth', 8)
+                .attr('markerHeight', 8)
+                .append('path')
+                .attr('d', 'M0,-5 L10,0 L0,5')
+                .attr('fill', 'rgba(255, 255, 255, 0.6)');
+            
+            // Add node hover info
+            const nodeInfo = d3.select('.node-info');
+            
+            node.on('mouseover', function(event, d) {
+                nodeInfo.html(`
+                    <h3>${d.label}</h3>
+                    <p><strong>Type:</strong> ${d.type.charAt(0).toUpperCase() + d.type.slice(1)}</p>
+                    <p><strong>Status:</strong> <span class="status-indicator" style="background: ${d.status === 'active' ? '#2ecc71' : '#e74c3c'}"></span> ${d.status === 'active' ? 'Active' : 'Inactive'}</p>
+                    <p><strong>IP:</strong> ${d.ip}</p>
+                    <p><strong>Model:</strong> ${d.model}</p>
+                `)
+                .style('left', (event.pageX + 15) + 'px')
+                .style('top', (event.pageY - 15) + 'px')
+                .style('opacity', 1);
+            });
+            
+            node.on('mousemove', function(event) {
+                nodeInfo
+                    .style('left', (event.pageX + 15) + 'px')
+                    .style('top', (event.pageY - 15) + 'px');
+            });
+            
+            node.on('mouseout', function() {
+                nodeInfo.style('opacity', 0);
+            });
+            
+            // Update positions
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                    
+                node
+                    .attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+            
+            // Add zoom capability
+            const zoom = d3.zoom()
+                .scaleExtent([0.2, 4])
+                .on('zoom', (event) => {
+                    zoomGroup.attr('transform', event.transform);
+                });
+                
+            svg.call(zoom);
+            
+            // Drag functions
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDN Controller with IDS - Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --success-color: #1cc88a;
+            --info-color: #36b9cc;
+            --warning-color: #f6c23e;
+            --danger-color: #e74a3b;
+            --dark-color: #2c3e50;
+            --ids-primary: #6610f2;
+            --ids-secondary: #6f42c1;
+            --sidebar-bg: #1a1f36;
+            --card-bg: #ffffff;
+            --body-bg: #f5f7fb;
+        }
+        
+        body {
+            background-color: var(--body-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #344767;
+            overflow-x: hidden;
+        }
+        
+        .sidebar {
+            background: linear-gradient(180deg, var(--sidebar-bg) 0%, #0f1529 100%);
+            min-height: 100vh;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(0, 0, 0, 0.2);
+            transition: all 0.3s;
+        }
+        
+        .sidebar-brand {
+            height: 70px;
+            padding: 15px 20px;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: 800;
+            text-align: center;
+            letter-spacing: 0.05rem;
+            z-index: 1;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-brand-icon i {
+            font-size: 2rem;
+            color: var(--ids-primary);
+        }
+        
+        .sidebar-brand-text {
+            display: inline;
+            color: white;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
+        .nav-link {
+            color: rgba(255, 255, 255, 0.7);
+            padding: 12px 20px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background: rgba(102, 16, 242, 0.2);
+        }
+        
+        .nav-link.active {
+            border-left: 3px solid var(--ids-primary);
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid #e3e6f0;
+            padding: 15px 20px;
+            font-weight: 700;
+            color: var(--dark-color);
+        }
+        
+        .stat-card {
+            border-left: 4px solid;
+            padding: 15px;
+            height: 100%;
+            background: white;
+        }
+        
+        .stat-card.primary { border-left-color: var(--primary-color); }
+        .stat-card.success { border-left-color: var(--success-color); }
+        .stat-card.info { border-left-color: var(--info-color); }
+        .stat-card.warning { border-left-color: var(--warning-color); }
+        .stat-card.danger { border-left-color: var(--danger-color); }
+        .stat-card.ids { border-left-color: var(--ids-primary); }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 5px 0;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 250px;
+            margin: 10px 0;
+        }
+        
+        .network-node {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .node-router { background-color: var(--primary-color); }
+        .node-switch { background-color: var(--info-color); }
+        .node-host { background-color: var(--success-color); }
+        .node-compromised { background-color: var(--danger-color); }
+        
+        .security-status {
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: inline-block;
+        }
+        
+        .status-normal {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .status-compromised {
+            background-color: #f8d7da;
+            color: #842029;
+        }
+        
+        .alert-card {
+            border-left: 4px solid;
+            transition: all 0.2s;
+        }
+        
+        .alert-card.critical {
+            border-left-color: var(--danger-color);
+        }
+        
+        .alert-card.warning {
+            border-left-color: var(--warning-color);
+        }
+        
+        .progress {
+            height: 10px;
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
+        }
+        
+        .model-health {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .model-health-label {
+            width: 100px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        #securityAlertsContainer .list-group-item {
+            border-left: 3px solid;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            padding: 12px 15px;
+            transition: all 0.3s;
+        }
+        
+        .list-group-item-warning {
+            border-left-color: var(--warning-color) !important;
+            background-color: rgba(246, 194, 62, 0.1);
+        }
+        
+        .list-group-item-danger {
+            border-left-color: var(--danger-color) !important;
+            background-color: rgba(231, 74, 59, 0.1);
+        }
+        
+        .ids-status-badge {
+            font-size: 0.85rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 0.25em solid rgba(0, 0, 0, 0.1);
+            border-right-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spinner-border 0.75s linear infinite;
+            vertical-align: text-bottom;
+        }
+        
+        @keyframes spinner-border {
+            to { transform: rotate(360deg); }
+        }
+        
+        .attack-badge {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+        
+        .badge-dos { background-color: #e74a3b; color: white; }
+        .badge-exploit { background-color: #f6c23e; color: #000; }
+        .badge-recon { background-color: #36b9cc; color: white; }
+        .badge-other { background-color: #5a5c69; color: white; }
+        
+        .network-health {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .health-excellent { background-color: #1cc88a; }
+        .health-good { background-color: #36b9cc; }
+        .health-fair { background-color: #f6c23e; }
+        .health-poor { background-color: #e74a3b; }
+        
+        .top-nav {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 15px 0;
+        }
+        
+        .last-update {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .main-content {
+            padding: 20px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-active { background-color: var(--success-color); }
+        .status-inactive { background-color: #6c757d; }
+        .status-warning { background-color: var(--warning-color); }
+        
+        .table-hover tbody tr:hover {
+            background-color: rgba(78, 115, 223, 0.05);
+        }
+        
+        .action-btn {
+            padding: 5px 10px;
+            font-size: 0.85rem;
+        }
+        
+        .system-health {
+            height: 10px;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        
+        .health-bar {
+            height: 100%;
+            border-radius: 5px;
+        }
+        
+        .health-legend {
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+        
+        .tab-content {
+            padding: 20px 0;
+        }
+        
+        .health-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .node-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-active { background-color: #1cc88a; }
+        .status-inactive { background-color: #6c757d; }
+        .status-warning { background-color: #f6c23e; }
+        
+        .attack-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+            background-color: var(--danger-color);
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.7; }
+        }
+        
+        .real-time-counter {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 d-md-block sidebar collapse text-white" style="position:fixed;">
+                <div class="position-sticky pt-3">
+                    <div class="sidebar-brand d-flex align-items-center justify-content-center">
+                        <div class="sidebar-brand-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="sidebar-brand-text mx-3">SDN IDS-IPS-QOS</div>
+                    </div>
+                    
+                    <ul class="nav flex-column mt-4">
+                        <li class="nav-item">
+                            <a class="nav-link active text-white" href="#">
+                                <i class="fas fa-fw fa-tachometer-alt me-2"></i>
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" href="/topology">
+                                <i class="fas fa-fw fa-project-diagram me-2"></i>
+                                Network Topology
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" href="/#">
+                                <i class="fas fa-fw fa-robot me-2"></i>
+                                Flow Table
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" href="#">
+                                <i class="fas fa-fw fa-sliders-h me-2"></i>
+                                QoS Configuration
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" href="#">
+                                <i class="fas fa-fw fa-cog me-2"></i>
+                                Settings
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <div class="mt-5 px-3">
+                        <div class="text-center mb-2">
+                            <span class="badge bg-success ids-status-badge">
+                                <i class="fas fa-circle me-1"></i> IDS Active
+                            </span>
+                        </div>
+                        <div class="text-center small text-white-50">
+                            Model: UNSW-NB15 v2.3
+                        </div>
+                        <div class="mt-3">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>System Health:</span>
+                                <span id="system-health-text">Unknown</span>
+                            </div>
+                            <div class="system-health bg-light">
+                                <div class="health-bar bg-success" id="system-health-bar" style="width: 95%"></div>
+                            </div>
+                            <div class="health-legend">
+                                <span><i class="fas fa-circle text-success"></i> <span id="health-value">95%</span></span>
+                                <span id="last-scan">Last Scan: A fow Minutes Ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-0" >
+                <div class="top-nav">
+                    <div class="container-fluid">
+                        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center" >
+                            <h1 class="h3 mb-0">Network Security & Qos Management Dashboard</h1>
+                            <div class="btn-toolbar">
+                                <div class="btn-group me-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="updateDashboard()">
+                                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-plus me-1"></i> New Device
+                                    </button>
+                                </div>
+                                <div class="last-update">
+                                    <i class="fas fa-clock me-1"></i>
+                                    Last updated: <span id="last-update-time">--:--:--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="main-content">
+                    <!-- Status Cards -->
+                    <div class="row mb-4">
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card stat-card primary h-100">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                                Routers
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800 stat-value" id="router-count">
+                                                <span class="loading-spinner"></span>
+                                            </div>
+                                            <small class="text-muted" id="active-routers">loading...</small>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-route fa-2x text-primary"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card stat-card success h-100">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                                Switches
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800 stat-value" id="switch-count">
+                                                <span class="loading-spinner"></span>
+                                            </div>
+                                            <small class="text-muted" id="active-switches">loading...</small>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-network-wired fa-2x text-success"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card stat-card info h-100">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                                Hosts
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800 stat-value" id="host-count">
+                                                <span class="loading-spinner"></span>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted" id="active-hosts">loading...</small>
+                                                <small class="text-danger fw-bold" id="compromised-hosts">0 compromised</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-laptop fa-2x text-info"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card stat-card danger h-100">
+                                <div class="card-body">
+                                    <div class="row no-gutters align-items-center">
+                                        <div class="col mr-2">
+                                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                                Network Status
+                                            </div>
+                                            <div class="h5 mb-0 font-weight-bold text-gray-800 stat-value" id="network-status">
+                                                <span class="loading-spinner"></span>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted" id="last-activity">loading...</small>
+                                                <small class="text-success" id="activity-indicator">
+                                                    <span class="real-time-counter">0</span> active
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-auto">
+                                            <i class="fas fa-network-wired fa-2x text-danger"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Real-time Monitoring Row -->
+                    <div class="row mb-4">
+                        <!-- Real-time IDS Monitoring -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                    <h6 class="m-0 font-weight-bold text-danger">
+                                        <i class="fas fa-shield-alt me-2"></i>
+                                        Real-time IDS Monitoring
+                                    </h6>
+                                    <div>
+                                        <span class="badge bg-danger" id="ids-packets-count">0</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="idsRealTimeChart"></canvas>
+                                    </div>
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="text-success">
+                                                <i class="fas fa-circle"></i> Normal: 
+                                                <span id="normal-packets">0</span>
+                                            </span>
+                                            <span class="text-danger">
+                                                <i class="fas fa-circle"></i> Attacks: 
+                                                <span id="attack-packets">0</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Bandwidth Utilization -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                    <h6 class="m-0 font-weight-bold text-primary">
+                                        <i class="fas fa-tachometer-alt me-2"></i>
+                                        Real-time Bandwidth
+                                    </h6>
+                                    <div class="small">
+                                        <span id="bandwidth-total">0 Mbps</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="bandwidthRealTimeChart"></canvas>
+                                    </div>
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="text-success">
+                                                <i class="fas fa-arrow-down"></i> RX: 
+                                                <span id="rx-bandwidth">0</span> Mbps
+                                            </span>
+                                            <span class="text-primary">
+                                                <i class="fas fa-arrow-up"></i> TX: 
+                                                <span id="tx-bandwidth">0</span> Mbps
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Security Row -->
+                    <div class="row mb-4">
+                        <!-- Attack Distribution -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                    <h6 class="m-0 font-weight-bold text-danger">
+                                        <i class="fas fa-fire me-2"></i>
+                                        Attack Distribution
+                                    </h6>
+                                    <div>
+                                        <span class="badge attack-badge badge-dos">DoS</span>
+                                        <span class="badge attack-badge badge-exploit">Exploits</span>
+                                        <span class="badge attack-badge badge-recon">Recon</span>
+                                        <span class="badge attack-badge badge-other">Other</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="attackChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Real-time Security Alerts -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                    <h6 class="m-0 font-weight-bold text-danger">
+                                        <i class="fas fa-bell me-2"></i>
+                                        Security Alerts
+                                    </h6>
+                                    <span class="badge bg-danger" id="alerts-count">0</span>
+                                </div>
+                                <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                                    <div class="list-group list-group-flush" id="securityAlertsContainer">
+                                        <div class="list-group-item text-center py-5">
+                                            <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                                            <p class="text-muted">No security alerts</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- IDS Model Health -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                                <h6 class="m-0 font-weight-bold text-primary">
+                                    <i class="fas fa-heartbeat me-2"></i>
+                                    IDS Model Health
+                                </h6>
+                                <span class="badge bg-success" id="model-status">Operational</span>
+                            </div>
+                            <div class="card-body">
+                                <div id="modelHealthContainer">
+                                    <div class="model-health">
+                                        <div class="model-health-label">Accuracy:</div>
+                                        <div class="flex-grow-1">
+                                            <div class="progress">
+                                                <div class="progress-bar bg-success" id="accuracy-bar" style="width: 95%">95%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="model-health">
+                                        <div class="model-health-label">Precision:</div>
+                                        <div class="flex-grow-1">
+                                            <div class="progress">
+                                                <div class="progress-bar bg-info" id="precision-bar" style="width: 92%">92%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="model-health">
+                                        <div class="model-health-label">Recall:</div>
+                                        <div class="flex-grow-1">
+                                            <div class="progress">
+                                                <div class="progress-bar bg-warning" id="recall-bar" style="width: 89%">89%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="model-health">
+                                        <div class="model-health-label">F1 Score:</div>
+                                        <div class="flex-grow-1">
+                                            <div class="progress">
+                                                <div class="progress-bar bg-primary" id="f1-bar" style="width: 90%">90%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-4">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Last Trained:</span>
+                                            <span id="last-trained">loading...</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Next Training:</span>
+                                            <span id="next-training">loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Network Nodes -->
+                    <div class="col-12">
+                        <div class="card mb-4">
+                            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                <h6 class="m-0 font-weight-bold text-primary">
+                                    <i class="fas fa-sitemap me-2"></i>
+                                    Network Nodes
+                                </h6>
+                                <div class="d-flex align-items-center">
+                                    <div class="input-group input-group-sm me-2" style="width: 200px;">
+                                        <input type="text" class="form-control" id="node-search" placeholder="Search nodes...">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="filterNodes()">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                    <div class="small last-update ms-3">
+                                        Last update: <span id="nodes-update-time">--:--:--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="nodesTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>ID</th>
+                                                <th>IP/MAC</th>
+                                                <th>MAC Address</th>
+                                                <th>Status</th>
+                                                <th>Security</th>
+                                                <th>Details</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="nodesTableBody">
+                                            <tr>
+                                                <td colspan="8" class="text-center py-5">
+                                                    <div class="spinner-border text-primary" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                    <p class="mt-3">Loading network nodes...</p>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast container for real-time alerts -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="liveAlertToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-danger text-white">
+                <strong class="me-auto" id="toast-title">Security Alert</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toast-message">
+                DoS attack detected from 192.168.1.2
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Initialize variables
+        let attackChart = null;
+        let idsRealTimeChart = null;
+        let bandwidthRealTimeChart = null;
+        let lastNetworkStats = {};
+        let lastSecurityStatus = {};
+        let lastNodesData = [];
+        let lastModelInfo = {};
+        let attackCounter = 0;
+
+        // Initialize Socket.IO connection
+        const socket = io();
+
+        // Handle Socket.IO events
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket server');
+        });
+
+        socket.on('real_time_alert', (alert) => {
+            if (alert.type === 'security') {
+                showLiveAlert(alert);
+                processRealtimeAlerts([alert]);
+            }
+        });
+
+        // Document ready function
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateDashboard();
+            setInterval(updateDashboard, 5000);
+            setInterval(updateRealTimeData, 1000);
+            setInterval(updateModelHealth, 10000);
+            setInterval(updateLastUpdateTime, 1000);
+        });
+
+        // Initialize charts
+        function initCharts() {
+            // Attack Distribution Chart
+            const attackCanvas = document.getElementById('attackChart');
+            if (attackCanvas) {
+                const attackCtx = attackCanvas.getContext('2d');
+                attackChart = new Chart(attackCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Normal', 'DoS', 'Exploits', 'Reconnaissance', 'Other'],
+                        datasets: [{
+                            data: [85, 5, 4, 3, 3],
+                            backgroundColor: [
+                                '#4e73df', '#e74a3b', '#f6c23e', '#36b9cc', '#5a5c69'
+                            ],
+                            hoverBackgroundColor: [
+                                '#2e59d9', '#d52a1e', '#dda20a', '#2c9faf', '#3a3b45'
+                            ],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 20
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.raw}%`;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+            }
+            
+            // IDS Real-time Chart
+            const idsCanvas = document.getElementById('idsRealTimeChart');
+            if (idsCanvas) {
+                const idsCtx = idsCanvas.getContext('2d');
+                idsRealTimeChart = new Chart(idsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: Array(30).fill(''),
+                        datasets: [
+                            {
+                                label: 'Normal Packets',
+                                data: Array(30).fill(0),
+                                borderColor: '#4e73df',
+                                backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            },
+                            {
+                                label: 'Attack Packets',
+                                data: Array(30).fill(0),
+                                borderColor: '#e74a3b',
+                                backgroundColor: 'rgba(231, 74, 59, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Packets/s'
+                                }
+                            },
+                            x: {
+                                display: false
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Bandwidth Real-time Chart
+            const bwCanvas = document.getElementById('bandwidthRealTimeChart');
+            if (bwCanvas) {
+                const bwCtx = bwCanvas.getContext('2d');
+                bandwidthRealTimeChart = new Chart(bwCtx, {
+                    type: 'line',
+                    data: {
+                        labels: Array(30).fill(''),
+                        datasets: [
+                            {
+                                label: 'RX Rate',
+                                data: Array(30).fill(0),
+                                borderColor: '#1cc88a',
+                                backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            },
+                            {
+                                label: 'TX Rate',
+                                data: Array(30).fill(0),
+                                borderColor: '#36b9cc',
+                                backgroundColor: 'rgba(54, 185, 204, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Mbps'
+                                }
+                            },
+                            x: {
+                                display: false
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Update dashboard data
+        function updateDashboard() {
+            updateNetworkStats();
+            updateSecurityStatus();
+            updateNodesTable();
+            updateAlerts();
+        }
+        
+        // Update real-time data
+        function updateRealTimeData() {
+            // Update IDS real-time data
+            fetch('/api/real-time/ids')
+                .then(response => response.json())
+                .then(data => {
+                    if (!idsRealTimeChart) return;
+                    
+                    const total = data.total || 0;
+                    const normal = data.normal || 0;
+                    const abnormal = data.abnormal || 0;
+                    
+                    // Update packet count
+                    document.getElementById('ids-packets-count').textContent = total;
+                    document.getElementById('normal-packets').textContent = normal;
+                    document.getElementById('attack-packets').textContent = abnormal;
+                    
+                    // Update chart
+                    updateChartData(idsRealTimeChart, 0, normal);
+                    updateChartData(idsRealTimeChart, 1, abnormal);
+                    
+                    // Update attack counter
+                    if (abnormal > 0) {
+                        attackCounter += abnormal;
+                        document.querySelector('.real-time-counter').textContent = attackCounter;
+                        document.querySelector('.attack-indicator').style.display = 'inline-block';
+                    }
+                });
+            
+            // Update bandwidth real-time data
+            fetch('/api/real-time/bandwidth')
+                .then(response => response.json())
+                .then(data => {
+                    if (!bandwidthRealTimeChart) return;
+                    
+                    let totalRx = 0;
+                    let totalTx = 0;
+                    
+                    for (const switchData of Object.values(data)) {
+                        for (const portData of Object.values(switchData)) {
+                            totalRx += portData.rx_rate || 0;
+                            totalTx += portData.tx_rate || 0;
+                        }
+                    }
+                    
+                    // Convert to Mbps
+                    totalRx = totalRx / 1000000;
+                    totalTx = totalTx / 1000000;
+                    
+                    // Update total bandwidth
+                    document.getElementById('bandwidth-total').textContent = 
+                        `${(totalRx + totalTx).toFixed(1)} Mbps`;
+                    document.getElementById('rx-bandwidth').textContent = totalRx.toFixed(1);
+                    document.getElementById('tx-bandwidth').textContent = totalTx.toFixed(1);
+                    
+                    // Update chart
+                    updateChartData(bandwidthRealTimeChart, 0, totalRx);
+                    updateChartData(bandwidthRealTimeChart, 1, totalTx);
+                });
+        }
+        
+        // Update chart data
+        function updateChartData(chart, datasetIndex, newValue) {
+            if (!chart) return;
+            
+            // Shift existing data left
+            chart.data.datasets[datasetIndex].data.shift();
+            // Add new value at the end
+            chart.data.datasets[datasetIndex].data.push(newValue);
+            // Update chart
+            chart.update();
+        }
+        
+        // Update network statistics
+        function updateNetworkStats() {
+            fetch('/api/network-stats')
+                .then(response => {
+                    if (!response.ok) throw new Error('Network error');
+                    return response.json();
+                })
+                .then(stats => {
+                    lastNetworkStats = stats;
+                    
+                    document.getElementById('router-count').textContent = stats.routers || 0;
+                    document.getElementById('active-routers').textContent = `${stats.active_routers || 0} active`;
+                    document.getElementById('switch-count').textContent = stats.switches || 0;
+                    document.getElementById('active-switches').textContent = `${stats.active_switches || 0} active`;
+                    document.getElementById('host-count').textContent = stats.hosts || 0;
+                    document.getElementById('active-hosts').textContent = `${stats.active_hosts || 0} active`;
+                    document.getElementById('compromised-hosts').textContent = `${stats.compromised_hosts || 0} compromised`;
+                    
+                    const statusElem = document.getElementById('network-status');
+                    if (stats.connected) {
+                        statusElem.textContent = 'Connected';
+                        statusElem.style.color = '#1cc88a';
+                    } else {
+                        statusElem.textContent = 'Disconnected';
+                        statusElem.style.color = '#e74a3b';
+                    }
+                    
+                    // Update system health
+                    const healthValue = Math.min(100, Math.max(0, 
+                        100 - (stats.compromised_hosts * 10) - 
+                        ((stats.hosts - stats.active_hosts) * 2)
+                    ));
+                    
+                    document.getElementById('system-health-text').textContent = 
+                        healthValue >= 90 ? 'Excellent' : 
+                        healthValue >= 75 ? 'Good' : 
+                        healthValue >= 50 ? 'Fair' : 'Poor';
+                    
+                    document.getElementById('system-health-bar').style.width = `${healthValue}%`;
+                    document.getElementById('system-health-bar').className = 
+                        `health-bar ${healthValue >= 90 ? 'bg-success' : 
+                          healthValue >= 75 ? 'bg-info' : 
+                          healthValue >= 50 ? 'bg-warning' : 'bg-danger'}`;
+                    
+                    document.getElementById('health-value').textContent = `${Math.round(healthValue)}%`;
+                })
+                .catch(error => {
+                    console.error('Network stats error:', error);
+                    document.getElementById('router-count').textContent = '0';
+                    document.getElementById('switch-count').textContent = '0';
+                    document.getElementById('host-count').textContent = '0';
+                    document.getElementById('network-status').textContent = 'Unknown';
+                });
+        }
+        
+        // Update security status
+        function updateSecurityStatus() {
+            fetch('/api/security-status')
+                .then(response => {
+                    if (!response.ok) throw new Error('Network error');
+                    return response.json();
+                })
+                .then(data => {
+                    lastSecurityStatus = data;
+                    
+                    // Update compromised hosts count
+                    const compromisedCount = data.compromised_hosts?.length || 0;
+                    document.getElementById('compromised-hosts').textContent = `${compromisedCount} compromised`;
+                    
+                    // Update last attack time
+                    if (data.alerts && data.alerts.length > 0) {
+                        const lastAlert = data.alerts[0];
+                        const timeString = new Date(lastAlert.timestamp * 1000).toLocaleTimeString();
+                        document.getElementById('last-activity').textContent = 
+                            `${lastAlert.type} at ${timeString}`;
+                    } else {
+                        document.getElementById('last-activity').textContent = 'No recent activity';
+                    }
+                    
+                    // Update attack distribution chart
+                    if (attackChart && data.attack_distribution && data.attack_distribution.by_type) {
+                        const attackTypes = Object.keys(data.attack_distribution.by_type);
+                        const attackValues = Object.values(data.attack_distribution.by_type);
+                        
+                        attackChart.data.labels = attackTypes;
+                        attackChart.data.datasets[0].data = attackValues;
+                        attackChart.update();
+                    }
+                })
+                .catch(error => {
+                    console.error('Security status error:', error);
+                    document.getElementById('last-activity').textContent = 'Status unknown';
+                });
+        }
+        
+        // Show live alert
+        function showLiveAlert(alert) {
+            const toast = new bootstrap.Toast(document.getElementById('liveAlertToast'));
+            document.getElementById('toast-title').textContent = 
+                alert.attack_type + ' Alert';
+            document.getElementById('toast-message').textContent = 
+                `${alert.attack_type} attack from ${alert.src} to ${alert.dst}`;
+            toast.show();
+        }
+        
+        // Process real-time alerts
+        function processRealtimeAlerts(alerts) {
+            const container = document.getElementById('securityAlertsContainer');
+            
+            alerts.forEach(alert => {
+                const timeString = new Date(alert.timestamp * 1000).toLocaleTimeString();
+                
+                // Determine alert type and styling
+                let alertClass = 'list-group-item-warning';
+                let icon = 'fa-exclamation-triangle';
+                let title = alert.attack_type || 'Alert';
+                
+                if (alert.attack_type === 'DoS') {
+                    alertClass = 'list-group-item-danger';
+                    icon = 'fa-bolt';
+                }
+                
+                const newAlert = `
+                    <a class="list-group-item list-group-item-action ${alertClass}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">
+                                <i class="fas ${icon} me-2"></i>
+                                ${title}
+                            </h6>
+                            <small>${timeString}</small>
+                        </div>
+                        <p class="mb-1">${alert.message || `From: ${alert.src} → To: ${alert.dst}`}</p>
+                        ${alert.probability ? 
+                            `<small class="text-muted">Probability: ${(alert.probability * 100).toFixed(1)}%</small>` : ''}
+                    </a>
+                `;
+                
+                // Add new alert at the top
+                container.innerHTML = newAlert + container.innerHTML;
+            });
+            
+            // Update alert count
+            const currentCount = parseInt(document.getElementById('alerts-count').textContent || 0);
+            document.getElementById('alerts-count').textContent = currentCount + alerts.length;
+        }
+        
+        // Update nodes table
+        function updateNodesTable() {
+            fetch('/api/topology')
+                .then(response => {
+                    if (!response.ok) throw new Error('Network error');
+                    return response.json();
+                })
+                .then(data => {
+                    lastNodesData = data.nodes || [];
+                    renderNodesTable(lastNodesData);
+                    document.getElementById('nodes-update-time').textContent = 
+                        new Date().toLocaleTimeString();
+                })
+                .catch(error => {
+                    console.error('Nodes table error:', error);
+                    document.getElementById('nodesTableBody').innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-danger">
+                                <i class="fas fa-exclamation-circle fa-2x mb-3"></i>
+                                <p>Failed to load node data</p>
+                                <small class="text-muted">${error.message}</small>
+                            </td>
+                        </tr>
+                    `;
+                });
+        }
+        
+        // Render nodes table
+        function renderNodesTable(nodes) {
+            const tableBody = document.getElementById('nodesTableBody');
+            
+            if (!nodes || nodes.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <i class="fas fa-exclamation-triangle fa-2x text-secondary mb-3"></i>
+                            <p class="text-muted">No network nodes found</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            let rows = '';
+            
+            nodes.forEach(node => {
+                const nodeType = node.type || 'unknown';
+                const status = node.status || 'unknown';
+                const isCompromised = node.is_compromised || false;
+                const mac = node.mac || '';
+                
+                // Status indicator
+                let statusClass = 'status-inactive';
+                if (status === 'active') statusClass = 'status-active';
+                else if (status === 'configured') statusClass = 'status-warning';
+                
+                // Security status
+                let securityClass = 'status-normal';
+                let securityText = 'Normal';
+                if (isCompromised) {
+                    securityClass = 'status-compromised';
+                    securityText = 'Compromised';
+                }
+                
+                // Node type indicator
+                let nodeClass = '';
+                if (nodeType === 'router') nodeClass = 'node-router';
+                else if (nodeType === 'switch') nodeClass = 'node-switch';
+                else if (nodeType === 'host') {
+                    nodeClass = isCompromised ? 'node-compromised' : 'node-host';
+                }
+                
+                // IP/MAC display
+                let identifier = node.ip || node.dpid || 'N/A';
+                
+                rows += `
+                    <tr>
+                        <td>
+                            <span class="network-node ${nodeClass}"></span>
+                            ${nodeType.charAt(0).toUpperCase() + nodeType.slice(1)}
+                        </td>
+                        <td>${node.id || 'N/A'}</td>
+                        <td>${identifier}</td>
+                        <td>${mac}</td>
+                        <td>
+                            <span class="node-status ${statusClass}"></span>
+                            ${status.charAt(0).toUpperCase() + status.slice(1)}
+                        </td>
+                        <td>
+                            <span class="security-status ${securityClass}">${securityText}</span>
+                        </td>
+                        <td>${node.label || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary action-btn">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = rows;
+        }
+
+        // Filter nodes
+        function filterNodes() {
+            const searchTerm = document.getElementById('node-search').value.toLowerCase();
+            if (!searchTerm) {
+                renderNodesTable(lastNodesData);
+                return;
+            }
+            
+            const filteredNodes = lastNodesData.filter(node => {
+                return (
+                    (node.id && node.id.toLowerCase().includes(searchTerm)) ||
+                    ((node.ip || node.mac || node.dpid) && 
+                     (node.ip || node.mac || node.dpid).toLowerCase().includes(searchTerm)) ||
+                    (node.type && node.type.toLowerCase().includes(searchTerm)) ||
+                    (node.status && node.status.toLowerCase().includes(searchTerm))
+                );
+            });
+            
+            renderNodesTable(filteredNodes);
+        }
+        
+        // Update alerts
+        function updateAlerts() {
+            fetch('/api/alerts')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('securityAlertsContainer');
+                    const alerts = data.alerts || [];
+                    document.getElementById('alerts-count').textContent = alerts.length;
+                    
+                    if (alerts.length === 0) {
+                        container.innerHTML = `
+                            <div class="list-group-item text-center py-5">
+                                <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                                <p class="text-muted">No security alerts</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    let html = '';
+                    alerts.slice(0, 10).forEach(alert => {
+                        const timeString = new Date(alert.timestamp * 1000).toLocaleTimeString();
+                        const alertClass = alert.type === 'security' ? 
+                            (alert.attack_type === 'DoS' ? 'list-group-item-danger' : 'list-group-item-warning') :
+                            'list-group-item-info';
+                        
+                        const icon = alert.type === 'security' ? 
+                            (alert.attack_type === 'DoS' ? 'fa-bolt' : 'fa-exclamation-triangle') : 
+                            'fa-tachometer-alt';
+                        
+                        html += `
+                            <a class="list-group-item list-group-item-action ${alertClass}">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">
+                                        <i class="fas ${icon} me-2"></i>
+                                        ${alert.type === 'security' ? alert.attack_type : 'QoS Alert'}
+                                    </h6>
+                                    <small>${timeString}</small>
+                                </div>
+                                <p class="mb-1">${alert.message || `From: ${alert.src} → To: ${alert.dst}`}</p>
+                                ${alert.probability ? 
+                                    `<small class="text-muted">Probability: ${(alert.probability * 100).toFixed(1)}%</small>` : ''}
+                            </a>
+                        `;
+                    });
+                    
+                    container.innerHTML = html;
+                });
+        }
+
+        // Update model health
+        function updateModelHealth() {
+            fetch('/api/ids/model-info')
+                .then(response => response.json())
+                .then(data => {
+                    lastModelInfo = data;
+                    
+                    if (data.accuracy) {
+                        document.getElementById('accuracy-bar').style.width = `${data.accuracy * 100}%`;
+                        document.getElementById('accuracy-bar').textContent = `${(data.accuracy * 100).toFixed(1)}%`;
+                    }
+                    
+                    if (data.precision) {
+                        document.getElementById('precision-bar').style.width = `${data.precision * 100}%`;
+                        document.getElementById('precision-bar').textContent = `${(data.precision * 100).toFixed(1)}%`;
+                    }
+                    
+                    if (data.recall) {
+                        document.getElementById('recall-bar').style.width = `${data.recall * 100}%`;
+                        document.getElementById('recall-bar').textContent = `${(data.recall * 100).toFixed(1)}%`;
+                    }
+                    
+                    if (data.f1_score) {
+                        document.getElementById('f1-bar').style.width = `${data.f1_score * 100}%`;
+                        document.getElementById('f1-bar').textContent = `${(data.f1_score * 100).toFixed(1)}%`;
+                    }
+                    
+                    if (data.last_trained) {
+                        document.getElementById('last-trained').textContent = 
+                            new Date(data.last_trained * 1000).toLocaleString();
+                    }
+                    
+                    if (data.next_training) {
+                        document.getElementById('next-training').textContent = 
+                            new Date(data.next_training * 1000).toLocaleString();
+                    }
+                    
+                    // Update model status
+                    if (data.status) {
+                        document.getElementById('model-status').textContent = 
+                            data.status.charAt(0).toUpperCase() + data.status.slice(1);
+                        
+                        document.getElementById('model-status').className = 
+                            `badge ${data.status === 'operational' ? 'bg-success' : 
+                             data.status === 'training' ? 'bg-warning' : 'bg-danger'}`;
+                    }
+                })
+                .catch(error => console.error('Model health error:', error));
+        }
+        
+        // Update last update time
+        function updateLastUpdateTime() {
+            const now = new Date();
+            document.getElementById('last-update-time').textContent = 
+                now.toLocaleTimeString();
+        }
+    </script>
+</body>
+</html>
